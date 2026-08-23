@@ -1,0 +1,15 @@
+# DeepSeek 用量监控 bundle：向 profile 根注入 host 侧插件。
+# 所有阈值与轮询参数都可随后在「设置」界面修改（命名空间 deepseek-usage）。
+- insert:
+    - id: dsh-deepseek-usage
+      name: dsh-deepseek-usage
+      config:
+        enabled: true
+        apiKeyEnv: DEEPSEEK_API_KEY
+        baseURL: https://api.deepseek.com
+        pollIntervalSeconds: 300
+        lowBalanceThreshold: 5
+        dailyUsageThreshold: 30
+        notifyLowBalance: true
+        notifyDailyUsage: true
+        platformUrl: https://platform.deepseek.com/usage

@@ -1,0 +1,21 @@
+# 日志与调试文件
+debug.log
+
+# 打包产物
+*.zip
+
+# 便携版构建目录（由主目录复制生成）
+dsh-deepseek-usage-portable/
+
+# VS Code / 编辑器
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Node
+node_modules/
