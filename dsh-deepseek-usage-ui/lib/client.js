@@ -7,7 +7,7 @@ window.__ModuleLoader__.load({
 
     // ── 与 @linxin666/dsh-ssh 完全一致的侧边栏 DOM 注入机制 ──────────────────
     const ENTRY_SELECTOR = "[data-dsh-usage-entry]";
-    const TOPUP_URL = "https://platform.deepseek.com/top_up";
+    const USAGE_URL = "https://platform.deepseek.com/usage";
     const ICON = "<svg viewBox=\"0 0 16 16\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"6\"/><path d=\"M5.75 9.75c0 .69.56 1.25 1.25 1.25h1.5a1.25 1.25 0 000-2.5h-1a1.25 1.25 0 010-2.5H9c.69 0 1.25.56 1.25 1.25\"/><path d=\"M8 5v6\"/></svg>";
 
     /** 找到侧边栏外壳根节点（找不到则稍后重试）。 */
@@ -39,8 +39,13 @@ window.__ModuleLoader__.load({
         "<span style=\"flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\">DSH用量信息</span>" +
         "<span data-usage-balance style=\"flex:none;font-size:11.5px;opacity:.85;font-variant-numeric:tabular-nums;\"></span>" +
         "<span data-usage-dot style=\"flex:none;width:8px;height:8px;border-radius:50%;background:transparent;\"></span>";
-      entry.addEventListener("click", refresh);
+      entry.addEventListener("click", openUsagePage);
       return entry;
+    }
+
+    /** 点击条目：直接打开 DeepSeek 开放平台用量界面。 */
+    function openUsagePage() {
+      try { window.open(USAGE_URL, "_blank"); } catch (_e) {}
     }
 
     /** 把条目插到「新会话」之后（工作区之前），并用 MutationObserver 自愈。 */
@@ -97,11 +102,6 @@ window.__ModuleLoader__.load({
         if (dotEl) {
           dotEl.style.background = low ? "#e5484d" : "transparent";
           dotEl.style.boxShadow = low ? "0 0 5px rgba(229,72,77,.8)" : "none";
-        }
-        if (entry && low) {
-          entry.onclick = () => { try { window.open(TOPUP_URL, "_blank"); } catch (_e) {} };
-        } else if (entry) {
-          entry.onclick = refresh;
         }
       } catch (_e) {
         // 数据源不可用时保持上次快照。
