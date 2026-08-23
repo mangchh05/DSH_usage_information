@@ -2,6 +2,9 @@
 
 一个给 [DSH Desktop](https://github.com/deepseek-ai/DeepSeek-Harness) 用的便携插件：**托盘实时余额、低余额充值提醒、单日用量超速提醒、`/deepseek-usage` 查询命令**。整包即拷即用，不写死任何本机路径。
 
+> **免责声明 / Disclaimer**：这是一个**非官方**的第三方插件，与 DeepSeek 及 DeepSeek Harness 官方**无任何关联，亦未获其认可或背书**。
+> *This is an unofficial third-party plugin and is not affiliated with or endorsed by DeepSeek.*
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## 功能
