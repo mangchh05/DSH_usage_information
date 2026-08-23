@@ -61,11 +61,6 @@ if (-not $ProfileName) {
 if (-not $ProfileName) { throw "无法确定 DSH profile，请用 -ProfileName 指定（如 desktop / web）" }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$source = Join-Path $scriptDir "dsh-deepseek-usage"
-if (-not (Test-Path (Join-Path $source "package.json"))) {
-  throw "未找到插件源目录：$source（install.ps1 必须与 dsh-deepseek-usage 同级）"
-}
-
 $profileDir = Join-Path $DshHome "profiles\$ProfileName"
 if (-not (Test-Path $profileDir)) {
   throw "profile 目录不存在：$profileDir"
@@ -74,26 +69,38 @@ if (-not (Test-Path (Join-Path $profileDir "node_modules"))) {
   Write-Host "==> 警告：$profileDir\node_modules 不存在；插件仍会复制，但需先完成 DSH 依赖安装才能加载。"
 }
 
-# ── 1) 复制插件 ─────────────────────────────────────────────────────────────
-$target = Join-Path $profileDir "node_modules\dsh-deepseek-usage"
-Write-Host "==> 复制插件到 $target"
-if (Test-Path $target) { Remove-Item $target -Recurse -Force }
-New-Item -ItemType Directory -Path $target -Force | Out-Null
-Copy-Item -Path (Join-Path $source "*") -Destination $target -Recurse -Force
+# ── 1) 复制两个插件（宿主 dsh-deepseek-usage + 侧边栏卡片 dsh-deepseek-usage-ui）──
+$plugins = @(
+  @{ dir = "dsh-deepseek-usage";    row = "dsh-deepseek-usage";    id = "dsh-deepseek-usage" },
+  @{ dir = "dsh-deepseek-usage-ui"; row = "dsh-deepseek-usage-ui"; id = "dsh-deepseek-usage-ui" }
+)
+foreach ($plugin in $plugins) {
+  $source = Join-Path $scriptDir $plugin.dir
+  if (-not (Test-Path (Join-Path $source "package.json"))) {
+    throw "未找到插件源目录：$source（install.ps1 必须与 $($plugin.dir) 同级）"
+  }
+  $target = Join-Path $profileDir "node_modules\$($plugin.dir)"
+  Write-Host "==> 复制插件到 $target"
+  if (Test-Path $target) { Remove-Item $target -Recurse -Force }
+  New-Item -ItemType Directory -Path $target -Force | Out-Null
+  Copy-Item -Path (Join-Path $source "*") -Destination $target -Recurse -Force
+}
 
-# ── 2) 幂等注入 cordis.patch.yml ────────────────────────────────────────────
+# ── 2) 幂等注入 cordis.patch.yml（两个插件各一行） ──────────────────────────
 $patchFile = Join-Path $profileDir "cordis.patch.yml"
 $raw = ""
 if (Test-Path $patchFile) { $raw = Get-Content $patchFile -Raw }
 if (-not $raw) { $raw = "[]`n" }
 
-if ($raw -match "dsh-deepseek-usage") {
-  Write-Host "==> cordis.patch.yml 已包含 dsh-deepseek-usage，跳过注入"
-} else {
+foreach ($plugin in $plugins) {
+  if ($raw -match $plugin.row) {
+    Write-Host "==> cordis.patch.yml 已包含 $($plugin.row)，跳过注入"
+    continue
+  }
   $entry = @"
 - insert:
-    - id: dsh-deepseek-usage
-      name: dsh-deepseek-usage
+    - id: $($plugin.id)
+      name: $($plugin.row)
 "@
   if ($raw -match '(?m)^\[\s*\]\s*$') {
     $raw = [regex]::Replace($raw, '(?m)^\[\s*\]\s*$', ($entry + "`n"))
@@ -106,11 +113,11 @@ if ($raw -match "dsh-deepseek-usage") {
     }
   }
   Set-Content -Path $patchFile -Value $raw -Encoding utf8 -NoNewline:$false
-  Write-Host "==> 已注入 cordis.patch.yml"
+  Write-Host "==> 已注入 $($plugin.row) 到 cordis.patch.yml"
 }
 
 Write-Host ""
 Write-Host "安装完成（profile: $ProfileName, DSH home: $DshHome）。"
-Write-Host "1) 重启 DSH Desktop（托盘菜单 → 退出，再重新打开）。"
+Write-Host "1) 重启 DSH Desktop（托盘菜单 → 退出，再重新打开；或从启动失败页点「切换并重启」）。"
 Write-Host "2) 若托盘显示余额未知：去 设置 → 模型 页确认 DEEPSEEK_API_KEY 已填写。"
 Write-Host "3) 阈值/间隔：设置 → deepseek-usage。"
