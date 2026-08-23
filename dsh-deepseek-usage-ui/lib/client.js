@@ -4,131 +4,122 @@ window.__ModuleLoader__.load({
     var module = { exports: {} };
     var exports = module.exports;
     Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
-    let react = require("react");
-    let react_jsx_runtime = require("react/jsx-runtime");
 
-    // ── 字典 ────────────────────────────────────────────────────────────────
-    const NS = "dshUsageInfo";
-    const zh = {
-      title: "DSH用量信息",
-      balance: "余额",
-      today: "今日用量",
-      low: "余额不足",
-      recharge: "前往充值",
-      unknown: "—"
-    };
-    const en = {
-      title: "DSH usage",
-      balance: "Balance",
-      today: "Today",
-      low: "Low balance",
-      recharge: "Top up",
-      unknown: "—"
-    };
+    // ── 与 @linxin666/dsh-ssh 完全一致的侧边栏 DOM 注入机制 ──────────────────
+    const ENTRY_SELECTOR = "[data-dsh-usage-entry]";
+    const TOPUP_URL = "https://platform.deepseek.com/top_up";
+    const ICON = "<svg viewBox=\"0 0 16 16\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"6\"/><path d=\"M5.75 9.75c0 .69.56 1.25 1.25 1.25h1.5a1.25 1.25 0 000-2.5h-1a1.25 1.25 0 010-2.5H9c.69 0 1.25.56 1.25 1.25\"/><path d=\"M8 5v6\"/></svg>";
 
-    /** 侧边栏常驻用量卡片：轮询 host 的实时快照接口，低余额时亮红灯。 */
-    function UsageInfoCard(props) {
+    /** 找到侧边栏外壳根节点（找不到则稍后重试）。 */
+    function sidebarRoot() {
+      const column = document.querySelector("[data-pane=\"sidebar\"], [class*=\"sidebarCol\"]");
+      if (column === null) return void 0;
+      return column.querySelector("[class*=\"logoRow\"]")?.parentElement ?? column.firstElementChild;
+    }
+
+    /** 新会话按钮（在 logoRow 内，或旧版 shell 的直接子按钮）。 */
+    function newSessionButton(root) {
+      const nested = root.querySelector("button[class*=\"newSession\"]");
+      if (nested !== null) return nested;
+      for (const child of root.children) if (child.tagName === "BUTTON") return child;
+      return void 0;
+    }
+
+    /** 构建侧边栏条目按钮。 */
+    function buildEntry() {
+      const entry = document.createElement("button");
+      entry.type = "button";
+      entry.setAttribute("data-dsh-usage-entry", "");
+      entry.setAttribute("data-dsh-plugin", "deepseek-usage");
+      entry.setAttribute("data-dsh-part", "sidebar-entry");
+      entry.setAttribute("aria-label", "DSH用量信息");
+      entry.style.cssText = "display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;background:transparent;color:var(--dsw-alias-label-primary,#1f2328);font-size:14px;line-height:20px;cursor:pointer;text-align:left;box-sizing:border-box;";
+      entry.innerHTML =
+        "<span style=\"width:18px;height:18px;flex:none;display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-secondary,#6b7280);\">" + ICON + "</span>" +
+        "<span style=\"flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\">DSH用量信息</span>" +
+        "<span data-usage-balance style=\"flex:none;font-size:11.5px;opacity:.85;font-variant-numeric:tabular-nums;\"></span>" +
+        "<span data-usage-dot style=\"flex:none;width:8px;height:8px;border-radius:50%;background:transparent;\"></span>";
+      entry.addEventListener("click", refresh);
+      return entry;
+    }
+
+    /** 把条目插到「新会话」之后（工作区之前），并用 MutationObserver 自愈。 */
+    function mountEntry() {
+      if (document.querySelector(ENTRY_SELECTOR) !== null) return () => {};
+      const entry = buildEntry();
+      let root;
+      let placed = false;
+      const place = () => {
+        if (root !== void 0 && !root.isConnected) { root = void 0; placed = false; }
+        root ??= sidebarRoot();
+        if (root === void 0) return;
+        const button = newSessionButton(root);
+        if (button === void 0) return;
+        if (entry.parentElement !== root) {
+          const row = button.closest("[class*=\"logoRow\"]");
+          const base = row !== null && row.parentElement === root ? row : button;
+          root.insertBefore(entry, base.nextElementSibling);
+        }
+        placed = true;
+      };
+      const waitObserver = new MutationObserver(place);
+      waitObserver.observe(document.body, { childList: true, subtree: true });
+      const rootObserver = new MutationObserver(() => {
+        if (root === void 0 || !root.isConnected) { placed = false; place(); return; }
+        if (!root.contains(entry)) place();
+      });
+      place();
+      if (placed && root !== void 0) rootObserver.observe(root, { childList: true, subtree: true });
+      return () => {
+        waitObserver.disconnect();
+        rootObserver.disconnect();
+        entry.remove();
+      };
+    }
+
+    /** 拉取宿主实时数据并更新条目（余额 + 今日用量 + 低余额红灯）。 */
+    async function refresh() {
       try {
-        const t = props.t || ((k) => zh[k] || k);
-        const [data, setData] = react.useState(null);
-        react.useEffect(() => {
-          let alive = true;
-          const load = async () => {
-            try {
-              const r = await fetch("/__dsh_deepseek_usage", { cache: "no-store" });
-              if (r.ok) {
-                const d = await r.json();
-                if (alive) setData(d);
-              }
-            } catch (_e) {
-              // 数据源不可用时保持上次快照。
-            }
-          };
-          load();
-          const id = window.setInterval(load, 60000);
-          return () => {
-            alive = false;
-            window.clearInterval(id);
-          };
-        }, []);
-        const total = data && data.total != null ? Number(data.total) : null;
-        const usage = data && data.todayUsage != null ? Number(data.todayUsage) : null;
-        const low = !!data?.low;
-        const style = {
-          padding: "8px 12px",
-          fontSize: "12px",
-          lineHeight: "1.5",
-          color: "var(--dsw-alias-label-primary, inherit)"
-        };
-        const titleStyle = { fontSize: "12px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" };
-        const dotStyle = {
-          width: "8px",
-          height: "8px",
-          borderRadius: "50%",
-          background: low ? "#e5484d" : "transparent",
-          boxShadow: low ? "0 0 5px rgba(229,72,77,.75)" : "none"
-        };
-        const row = { display: "flex", justifyContent: "space-between", gap: "8px", marginTop: "3px", opacity: low ? 1 : 0.85 };
-        const rechargeLink = { color: "var(--dsw-alias-state-error-primary, #e5484d)", cursor: "pointer", textDecoration: "underline" };
-        const openTopup = () => {
-          try { window.open("https://platform.deepseek.com/top_up", "_blank"); } catch (_e) {}
-        };
-        return react_jsx_runtime.jsx("div", {
-          style: style,
-          children: [
-            react_jsx_runtime.jsx("div", {
-              style: titleStyle,
-              children: [
-                react_jsx_runtime.jsx("span", { style: dotStyle }),
-                react_jsx_runtime.jsx("span", { children: t("title") })
-              ]
-            }),
-            react_jsx_runtime.jsx("div", {
-              style: row,
-              children: [
-                react_jsx_runtime.jsx("span", { children: t("balance") }),
-                react_jsx_runtime.jsx("b", { children: total == null ? t("unknown") : "¥" + total.toFixed(2) })
-              ]
-            }),
-            usage != null
-              ? react_jsx_runtime.jsx("div", {
-                  style: row,
-                  children: [
-                    react_jsx_runtime.jsx("span", { children: t("today") }),
-                    react_jsx_runtime.jsx("b", { children: "¥" + usage.toFixed(2) })
-                  ]
-                })
-              : null,
-            low
-              ? react_jsx_runtime.jsx("div", {
-                  style: { marginTop: "4px", color: "var(--dsw-alias-state-error-primary, #e5484d)" },
-                  children: [
-                    react_jsx_runtime.jsx("span", { children: t("low") + " " }),
-                    react_jsx_runtime.jsx("a", { style: rechargeLink, onClick: openTopup, children: t("recharge") })
-                  ]
-                })
-              : null
-          ]
-        });
+        const r = await fetch("/__dsh_deepseek_usage", { cache: "no-store" });
+        if (!r.ok) return;
+        const d = await r.json();
+        const total = d.total != null ? Number(d.total) : null;
+        const usage = d.todayUsage != null ? Number(d.todayUsage) : null;
+        const low = !!d.low;
+        const entry = document.querySelector(ENTRY_SELECTOR);
+        const balanceEl = entry?.querySelector("[data-usage-balance]");
+        const dotEl = entry?.querySelector("[data-usage-dot]");
+        if (balanceEl) {
+          balanceEl.textContent = total == null ? "" : "¥" + total.toFixed(2) + (usage != null ? " · " + usage.toFixed(2) : "");
+          balanceEl.style.color = low ? "var(--dsw-alias-state-error-primary,#e5484d)" : "";
+          balanceEl.title = low ? "余额不足，点击前往充值" : "";
+        }
+        if (dotEl) {
+          dotEl.style.background = low ? "#e5484d" : "transparent";
+          dotEl.style.boxShadow = low ? "0 0 5px rgba(229,72,77,.8)" : "none";
+        }
+        if (entry && low) {
+          entry.onclick = () => { try { window.open(TOPUP_URL, "_blank"); } catch (_e) {} };
+        } else if (entry) {
+          entry.onclick = refresh;
+        }
       } catch (_e) {
-        return null;
+        // 数据源不可用时保持上次快照。
       }
     }
 
     function apply(ctx) {
-      ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-deepseek-usage-ui: dictionary");
-      ctx.slots.inject("web-ui.plugin.item", () => {
-        return ctx.slots.register({
-          name: "web-ui.plugin.item",
-          id: "dsh-usage",
-          order: 50,
-          label: () => "DSH用量信息",
-          locale: NS
-        }, UsageInfoCard);
+      if (typeof document === "undefined") return;
+      const disposeMount = mountEntry();
+      void refresh();
+      const timer = window.setInterval(refresh, 60000);
+      ctx.effect(() => () => {
+        window.clearInterval(timer);
+        disposeMount();
       });
     }
 
-    const inject = ["slots", "locale"];
+    const inject = [];
     exports.apply = apply;
     exports.inject = inject;
     return module.exports;
