@@ -117,7 +117,7 @@ window.__ModuleLoader__.load({
 
     function apply(ctx) {
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-deepseek-usage-ui: dictionary");
-      ctx.effect(() => ctx.slots.inject("web-ui.plugin.item", () => {
+      ctx.slots.inject("web-ui.plugin.item", () => {
         return ctx.slots.register({
           name: "web-ui.plugin.item",
           id: "dsh-usage",
@@ -125,7 +125,7 @@ window.__ModuleLoader__.load({
           label: () => "DSH用量信息",
           locale: NS
         }, UsageInfoCard);
-      }), "dsh-deepseek-usage-ui: sidebar usage card");
+      });
     }
 
     const inject = ["slots", "locale"];
