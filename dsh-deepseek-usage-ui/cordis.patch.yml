@@ -1,0 +1,6 @@
+# dsh-deepseek-usage-ui bundle patch: inserts the dual-face plugin row into the
+# profile roster. The `dsh.client` declaration in package.json makes the browser
+# half (exports "./client", served at /plugins/<id>/client.js) load in the web GUI.
+- insert:
+    - id: dsh-deepseek-usage-ui
+      name: dsh-deepseek-usage-ui

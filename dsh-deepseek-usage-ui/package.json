@@ -1,0 +1,44 @@
+{
+  "name": "dsh-deepseek-usage-ui",
+  "version": "1.0.0",
+  "description": "DSH 用量信息：侧边栏常驻用量卡片（余额/今日用量 + 低余额红灯），数据来自 dsh-deepseek-usage 的 host 路由。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "default": "./lib/invariant.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.1.1-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale"
+      ],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "react": "^18.2.0"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/**/*.js.map",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "license": "MIT"
+}
